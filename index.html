@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>عرض تفاعلي - مسابقة ريشة رقمية</title>
+    <!-- تحميل خط تجوال وتايلند وخطوط إضافية مناسبة للعرض على الشاشات الكبيرة -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- تحميل أيقونات Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- مكتبة توليد رمز QR التلقائي -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- تحميل Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        brandBlue: '#0B3C8A',
+                        brandBlueDark: '#07275C',
+                        brandOrange: '#F97316',
+                        brandTeal: '#0D9488',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ضبط الشاشة لتناسب العرض الأفقي على التلفاز بدون تمرير */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #051329;
+            color: #ffffff;
+            font-family: 'Cairo', sans-serif;
+            user-select: none;
+        }
+
+        /* خلفية متدرجة ناعمة مستوحاة من ألوان الهوية البصرية */
+        .tv-backdrop {
+            background: radial-gradient(circle at 80% 20%, rgba(13, 148, 136, 0.16), transparent 45%),
+                        radial-gradient(circle at 15% 85%, rgba(249, 115, 22, 0.14), transparent 45%),
+                        linear-gradient(135deg, #061836 0%, #092149 55%, #051126 100%);
+        }
+
+        /* حاوية الفيديو الطولي (9:16) المتناسقة داخل التخطيط الأفقي */
+        .portrait-video-box {
+            aspect-ratio: 9 / 16;
+            height: 100%;
+            max-height: calc(100vh - 118px);
+            width: auto;
+            max-width: 100%;
+        }
+
+        /* حركة دخول سلسة للشرائح */
+        @keyframes slideFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(14px) scale(0.99);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .slide-animate {
+            animation: slideFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        /* تحسين مظهر شريط التقدم السفلي للشريحة */
+        .progress-bar-fill {
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body class="tv-backdrop flex flex-col justify-between h-screen w-screen overflow-hidden">
+
+    <!-- الشريط العلوي المختصر -->
+    <header class="h-16 px-6 lg:px-10 flex items-center justify-between border-b border-white/10 bg-white/5 backdrop-blur-md shrink-0">
+        <div class="flex items-center gap-4">
+            <!-- شعار مبسط لريشة رقمية -->
+            <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-brandOrange to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/25">
+                <i class="fa-solid fa-feather-pointed text-white text-xl"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-xl lg:text-2xl font-black tracking-tight text-white">مسابقة ريشة رقمية</h1>
+                    <span class="hidden sm:inline-block px-3 py-0.5 rounded-full text-xs font-bold bg-brandTeal/25 text-teal-200 border border-teal-400/30">
+                        بريشتك الرقمية لمستقبل مستدام
+                    </span>
+                </div>
+                <p class="text-xs lg:text-sm text-slate-300 font-semibold">
+                    المركز الإقليمي لتكنولوجيا المعلومات والاتصال (RCICT)
+                </p>
+            </div>
+        </div>
+
+        <!-- أدوات التحكم السريعة للتلفاز -->
+        <div class="flex items-center gap-3">
+            <button
+                id="autoPlayToggleBtn"
+                type="button"
+                onclick="toggleAutoPlay()"
+                class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-sm font-bold flex items-center gap-2 transition cursor-pointer"
+                title="تشغيل أو إيقاف التقليب التلقائي"
+            >
+                <i id="autoPlayIcon" class="fa-solid fa-pause text-brandOrange"></i>
+                <span id="autoPlayText">تلقائي</span>
+            </button>
+
+            <button
+                id="fullscreenBtn"
+                type="button"
+                onclick="toggleFullscreen()"
+                class="px-4 py-2 rounded-xl bg-brandOrange hover:bg-orange-500 text-white text-sm font-bold flex items-center gap-2 shadow-md shadow-orange-600/30 transition cursor-pointer"
+                title="ملء الشاشة"
+            >
+                <i id="fullscreenIcon" class="fa-solid fa-expand"></i>
+                <span class="hidden md:inline">ملء الشاشة</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- منطقة العرض الرئيسية (فيديو طولي على الجانب الأيسر + محتوى تفاعلي واسع على الجانب الأيمن) -->
+    <main class="flex-1 min-h-0 px-6 lg:px-10 py-4 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+
+        <!-- الجانب الأيسر: إطار الفيديو الطولي -->
+        <section class="lg:col-span-4 h-full flex items-center justify-center min-h-0">
+            <div class="portrait-video-box relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-white/15 shadow-2xl shadow-black/60 flex items-center justify-center">
+                <!-- مشغل الفيديو المباشر -->
+                <video
+                    id="mainVideo"
+                    class="w-full h-full object-cover"
+                    autoplay
+                    muted
+                    loop
+                    playsinline
+                    preload="auto"
+                ></video>
+
+                <!-- إطار التضمين المباشر لرابط Google Drive -->
+                <iframe
+                    id="drivePreviewFrame"
+                    class="hidden w-full h-full border-0"
+                    allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                    allowfullscreen
+                ></iframe>
+
+                <!-- بطاقة العرض التفاعلية لرابط SharePoint عند منع التضمين -->
+                <div
+                    id="sharepointLaunchPanel"
+                    class="hidden w-full h-full flex flex-col items-center justify-center p-6 text-center gap-5 bg-gradient-to-b from-brandBlueDark via-slate-900 to-slate-950"
+                >
+                    <div class="w-20 h-20 rounded-3xl bg-brandOrange/20 border-2 border-orange-400/40 text-brandOrange flex items-center justify-center text-4xl shadow-lg shadow-orange-500/20">
+                        <i class="fa-solid fa-film"></i>
+                    </div>
+                    <div class="space-y-2">
+                        <h3 class="text-xl lg:text-2xl font-black text-white">فيديو مسابقة ريشة رقمية</h3>
+                        <p class="text-sm lg:text-base text-slate-300 leading-relaxed">
+                            يمكنك رفع وتشغيل ملف الفيديو مباشرة من جهازك بدون الحاجة لرابط، أو فتح الرابط المرفق في نافذة جديدة.
+                        </p>
+                    </div>
+                    <div class="flex flex-col w-full gap-3">
+                        <label
+                            for="localVideoInput"
+                            class="w-full py-3.5 px-4 rounded-2xl bg-brandOrange hover:bg-orange-500 text-white text-sm lg:text-base font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 cursor-pointer transition"
+                        >
+                            <i class="fa-solid fa-clapperboard"></i>
+                            <span>اختر أو اسحب ملف الفيديو هنا</span>
+                        </label>
+                        <input id="localVideoInput" type="file" accept="video/*" class="hidden">
+                        <a
+                            id="openSharePointBtn"
+                            href="#"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="w-full py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-slate-200 text-sm font-bold flex items-center justify-center gap-2 transition"
+                        >
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            <span>فتح رابط الفيديو</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- زر عائم لتفعيل/كتم الصوت -->
+                <button
+                    id="muteBtn"
+                    type="button"
+                    onclick="toggleMute()"
+                    class="absolute bottom-4 left-4 z-20 w-12 h-12 rounded-2xl bg-black/65 hover:bg-black/85 text-white border border-white/20 flex items-center justify-center backdrop-blur-md transition cursor-pointer"
+                    aria-label="تبديل الصوت"
+                    title="تشغيل / كتم الصوت"
+                >
+                    <i id="muteIcon" class="fa-solid fa-volume-xmark text-lg text-brandOrange"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- الجانب الأيمن: بطاقة العرض التفاعلي الكبيرة المناسبة لشاشة التلفاز -->
+        <section class="lg:col-span-8 h-full min-h-0 flex flex-col justify-between bg-white/[0.06] backdrop-blur-xl border border-white/15 rounded-3xl p-6 lg:p-9 shadow-2xl">
+            <!-- الجزء العلوي من البطاقة: الشارة ورقم الشريحة والعداد الزمني -->
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <span id="slideBadge" class="px-4 py-1.5 rounded-full text-sm lg:text-base font-extrabold bg-brandOrange/20 text-orange-300 border border-orange-400/30">
+                        إعلان الإطلاق
+                    </span>
+                    <span id="slideCounter" class="text-sm lg:text-base font-bold text-slate-300">
+                        شريحة 1 من 8
+                    </span>
+                </div>
+                <div id="slideDurationBadge" class="text-sm lg:text-base font-bold text-teal-300 flex items-center gap-2">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="slideTimeText">10 ثوانٍ</span>
+                </div>
+            </div>
+
+            <!-- المحتوى المتغير للشريحة -->
+            <div id="slideContentContainer" class="flex-1 min-h-0 overflow-y-auto py-5 slide-animate flex flex-col justify-center">
+                <!-- يتم حقن محتوى الشريحة هنا بواسطة JavaScript -->
+            </div>
+
+            <!-- شريط التقدم وأزرار التنقل -->
+            <div class="pt-3 border-t border-white/10 shrink-0 space-y-3">
+                <!-- مؤشر تقدم الشريحة الحالية -->
+                <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div id="slideProgressBar" class="progress-bar-fill h-full bg-gradient-to-r from-brandOrange via-amber-400 to-brandTeal w-0 rounded-full"></div>
+                </div>
+
+                <!-- أزرار السابق / نقاط الشرائح / التالي -->
+                <div class="flex items-center justify-between gap-4">
+                    <button
+                        id="prevSlideBtn"
+                        type="button"
+                        onclick="prevSlide()"
+                        class="px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-base lg:text-lg font-extrabold flex items-center gap-2 transition cursor-pointer"
+                    >
+                        <i class="fa-solid fa-chevron-right"></i>
+                        <span>السابق</span>
+                    </button>
+
+                    <!-- نقاط الانتقال المباشر بين الشرائح -->
+                    <div id="slideDots" class="flex items-center gap-2.5 flex-wrap justify-center">
+                        <!-- يتم توليد النقاط ديناميكياً -->
+                    </div>
+
+                    <button
+                        id="nextSlideBtn"
+                        type="button"
+                        onclick="nextSlide()"
+                        class="px-5 py-2.5 rounded-2xl bg-brandOrange hover:bg-orange-500 text-white text-base lg:text-lg font-extrabold flex items-center gap-2 shadow-lg shadow-orange-600/25 transition cursor-pointer"
+                    >
+                        <span>التالي</span>
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- الشريط السفلي المختصر -->
+    <footer class="h-10 px-6 lg:px-10 flex items-center justify-between text-xs lg:text-sm text-slate-400 border-t border-white/5 bg-black/25 shrink-0">
+        <span>العرض التفاعلي لمسابقة «ريشة رقمية» — مصمم للعرض الأفقي على الشاشات الكبيرة</span>
+        <span class="hidden sm:inline">يمكنك التنقل عبر الأسهم (← / →) أو الأزرار</span>
+    </footer>
+
+    <script>
+        // فيديو مضمّن مباشرة داخل الصفحة (يمكن وضع Data URI أو رابط مباشر هنا لتضمينه بدون رابط خارجي)
+        const EMBEDDED_VIDEO_SRC = "";
+
+        // رابط الفيديو المباشر (.mp4 أو رابط تنزيل مباشر) - إذا تُرك فارغاً سيتم استخدام رابط Google Drive أدناه
+        const DIRECT_VIDEO_URL = "";
+
+        // رابط الفيديو من Google Drive
+        const GOOGLE_DRIVE_VIDEO_URL = "https://drive.google.com/file/d/1hc9QpJTvpLHy6z_ECB6YwilGgM4NmVbS/view?usp=drivesdk";
+
+        // رابط الدليل الشامل لمسابقة ريشة رقمية على SharePoint
+        const GUIDE_PDF_URL = "https://moebh-my.sharepoint.com/:b:/g/personal/s_alnoaimi_moe_bh/IQBWtKphH_czRaijtEmmfiJHAX7PTnsTEE1yw_2Fdi-nt4I?e=QRimId";
+
+        // يمكنك وضع رابط صورة QR جاهزة هنا إذا رغبت، وإلا سيتم توليد رمز QR تلقائياً لرابط الدليل أعلاه
+        const QR_CODE_IMAGE_URL = "";
+
+        // تعريف الشرائح الثماني وفق التسلسل والمحتوى المطلوب
+        const slides = [
+            {
+                badge: "إعلان الإطلاق",
+                duration: 10,
+                type: "launch_announcement",
+                title: "يُعلن المركز عن إطلاق مسابقة «ريشة رقمية»",
+                subtitle: "تحت شعار: «بريشتك الرقمية لمستقبل مستدام»",
+                description: "يدعو المركز الإقليمي لتكنولوجيا المعلومات والاتصال (RCICT) الطلبة المبدعين للمشاركة في مسابقة الفن الرقمي وإبراز طاقاتهم الإبداعية.",
+                deadlineNote: "يتم استقبال الترشيحات الأولية حتى 14 ديسمبر 2026"
+            },
+            {
+                badge: "الهدف العام",
+                duration: 10,
+                type: "general_goal",
+                title: "تنمية الإبداع الفني والابتكار الرقمي",
+                subtitle: "تحت شعار: «بريشتك الرقمية لمستقبل مستدام»",
+                description: "تعزيز قدرة الطلبة على التعبير البصري عن القضايا المعاصرة والتحول الرقمي وأهداف التنمية المستدامة بأسلوب فني رقمي مبتكر.",
+                highlights: [
+                    { icon: "fa-wand-magic-sparkles", text: "تحويل الأفكار الإبداعية إلى أعمال بصرية رقمية" },
+                    { icon: "fa-earth-americas", text: "ربط الفن الرقمي بقضايا الاستدامة والمستقبل" }
+                ]
+            },
+            {
+                badge: "الجهات الشريكة",
+                duration: 10,
+                type: "partners",
+                title: "الجهات الشريكة في المسابقة",
+                subtitle: "تكامل مؤسسي لدعم المواهب والأنشطة الإبداعية",
+                partners: [
+                    {
+                        name: "إدارة الأنشطة الطلابية",
+                        icon: "fa-users-rectangle"
+                    },
+                    {
+                        name: "قطاع التعليم",
+                        icon: "fa-graduation-cap"
+                    }
+                ]
+            },
+            {
+                badge: "الفئة المستهدفة",
+                duration: 10,
+                type: "target_audience",
+                title: "طلبة المدارس الحكومية بمملكة البحرين",
+                subtitle: "مفتوحة للمراحل الدراسية الثلاث وفق مستويات مناسبة",
+                stages: [
+                    { title: "المرحلة الابتدائية", icon: "fa-child-reaching" },
+                    { title: "المرحلة الإعدادية", icon: "fa-user-graduate" },
+                    { title: "المرحلة الثانوية", icon: "fa-laptop-code" }
+                ],
+                description: "تتيح المسابقة للطلبة إبراز مهاراتهم الفنية والتقنية ضمن بيئة محفزة تصقل مواهبهم الرقمية."
+            },
+            {
+                badge: "محاور المسابقة",
+                duration: 10,
+                type: "axes",
+                title: "المحاور الخمسة للمسابقة",
+                subtitle: "يختار المشارك محورًا واحدًا للتعبير عنه بعمل فني أصيل",
+                axesList: [
+                    "المواطنة الرقمية",
+                    "الذكاء الاصطناعي ومستقبل التعليم",
+                    "الفن الرقمي في خدمة التنمية المستدامة",
+                    "حلول رقمية لعالم أكثر عدالة",
+                    "شباب يصنعون المستقبل"
+                ]
+            },
+            {
+                badge: "الشروط",
+                duration: 10,
+                type: "conditions_apps",
+                title: "الشروط",
+                subtitle: "إنتاج فني أصيل باستخدام تطبيقات الرسم الحر المباشر",
+                appsTitle: "التطبيقات والبرامج الرقمية:",
+                appsList: [
+                    "جميع البرامج أو التطبيقات التي تتيح الرسم الرقمي الحر"
+                ],
+                rulesList: [
+                    "عمل أصيل من إبداع الطالب دون استخدام الذكاء الاصطناعي أو العناصر الجاهزة في إنتاج العمل",
+                    "اختيار محور واحد فقط مع وصف مختصر للفكرة (3–5 أسطر)",
+                    "صيغة JPEG أو PNG أو PDF بدقة لا تقل عن 300 DPI وحجم لا يتجاوز 25 MB واتجاه أفقي (Landscape)"
+                ]
+            },
+            {
+                badge: "الجوائز والتكريم",
+                duration: 10,
+                type: "awards",
+                title: "جوائز قيّمة وتكريم مستحق",
+                subtitle: "تقدير للإبداع والتميز في المستويين المتقدم والمتوسط",
+                description: "تنتظر المتميزين جوائز قيّمة وشهادات تقدير، إلى جانب عرض الأعمال المتميزة في المعرض الختامي والمنصات الرقمية.",
+                highlights: [
+                    { icon: "fa-trophy", text: "جوائز قيّمة للفائزين الأوائل في المستويين المتقدم والمتوسط" },
+                    { icon: "fa-award", text: "شهادات تقدير ومشاركة وعرض في المعرض الختامي" }
+                ]
+            },
+            {
+                badge: "لمزيد من المعلومات",
+                duration: 10,
+                type: "qr_info",
+                title: "امسح الرمز للاطلاع على الدليل الكامل",
+                subtitle: "تعرّف على كافة التفاصيل والمواعيد وآليات الترشح عبر رمز QR",
+                description: "وجّه كاميرا هاتفك نحو رمز الاستجابة السريعة (QR Code) للوصول المباشر إلى الدليل الشامل لمسابقة ريشة رقمية.",
+                qrUrl: QR_CODE_IMAGE_URL
+            }
+        ];
+
+        // حالة العرض
+        let currentSlideIndex = 0;
+        let elapsedSecondsInSlide = 0;
+        let isAutoPlay = true;
+        let isMuted = true;
+        let tickInterval = null;
+
+        // مراجع العناصر
+        const videoEl = document.getElementById("mainVideo");
+        const driveFrameEl = document.getElementById("drivePreviewFrame");
+        const launchPanelEl = document.getElementById("sharepointLaunchPanel");
+        const openSharePointBtnEl = document.getElementById("openSharePointBtn");
+        const localVideoInputEl = document.getElementById("localVideoInput");
+        const slideContentContainer = document.getElementById("slideContentContainer");
+        const slideBadgeEl = document.getElementById("slideBadge");
+        const slideCounterEl = document.getElementById("slideCounter");
+        const slideTimeTextEl = document.getElementById("slideTimeText");
+        const slideProgressBarEl = document.getElementById("slideProgressBar");
+        const slideDotsEl = document.getElementById("slideDots");
+        const muteIconEl = document.getElementById("muteIcon");
+        const autoPlayIconEl = document.getElementById("autoPlayIcon");
+        const autoPlayTextEl = document.getElementById("autoPlayText");
+
+        /**
+         * إظهار لوحة فتح الفيديو في المتصفح أو اختيار ملف محلي عند تعذر التشغيل المباشر
+         */
+        function showVideoLaunchPanel() {
+            if (EMBEDDED_VIDEO_SRC) {
+                loadVideoSource(EMBEDDED_VIDEO_SRC);
+                return;
+            }
+            if (videoEl) {
+                videoEl.pause();
+                videoEl.classList.add("hidden");
+            }
+            if (driveFrameEl) {
+                driveFrameEl.classList.add("hidden");
+            }
+            if (launchPanelEl) {
+                launchPanelEl.classList.remove("hidden");
+            }
+        }
+
+        /**
+         * استخراج معرف ملف Google Drive وبناء رابط المعاينة المضمّنة مع التشغيل التلقائي
+         */
+        function getGoogleDrivePreviewUrl(url) {
+            if (!url) return "";
+            const match = url.match(/\/file\/d\/([^/]+)/);
+            if (match && match[1]) {
+                return `https://drive.google.com/file/d/${match[1]}/preview?autoplay=1&mute=1`;
+            }
+            return "";
+        }
+
+        /**
+         * تحميل وتشغيل مصدر الفيديو مباشرة داخل عنصر الفيديو
+         */
+        function loadVideoSource(src) {
+            if (!src || !videoEl) return;
+            if (driveFrameEl) {
+                driveFrameEl.classList.add("hidden");
+                driveFrameEl.removeAttribute("src");
+            }
+            if (launchPanelEl) {
+                launchPanelEl.classList.add("hidden");
+            }
+            videoEl.classList.remove("hidden");
+            videoEl.autoplay = true;
+            videoEl.loop = true;
+            videoEl.playsInline = true;
+            videoEl.src = src;
+            videoEl.muted = isMuted;
+            videoEl.load();
+
+            const attemptPlay = () => {
+                const playPromise = videoEl.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {
+                        // إذا منع المتصفح التشغيل التلقائي بالصوت أو بدونه، نعيد المحاولة عند أول تفاعل
+                        const resumeOnInteraction = () => {
+                            videoEl.play().catch(() => {});
+                            document.removeEventListener("click", resumeOnInteraction);
+                            document.removeEventListener("keydown", resumeOnInteraction);
+                            document.removeEventListener("touchstart", resumeOnInteraction);
+                        };
+                        document.addEventListener("click", resumeOnInteraction, { once: true });
+                        document.addEventListener("keydown", resumeOnInteraction, { once: true });
+                        document.addEventListener("touchstart", resumeOnInteraction, { once: true });
+                    });
+                }
+            };
+
+            // إعادة التشغيل تلقائياً عند انتهاء الفيديو لضمان التكرار المستمر
+            videoEl.onended = () => {
+                videoEl.currentTime = 0;
+                videoEl.loop = true;
+                attemptPlay();
+            };
+
+            // إعادة التشغيل تلقائياً إذا توقف الفيديو لأي سبب أثناء العرض
+            videoEl.onpause = () => {
+                if (!videoEl.classList.contains("hidden") && videoEl.src) {
+                    attemptPlay();
+                }
+            };
+
+            videoEl.addEventListener("loadedmetadata", attemptPlay, { once: true });
+            videoEl.addEventListener("canplay", attemptPlay, { once: true });
+            attemptPlay();
+        }
+
+        /**
+         * تهيئة الفيديو مع دعم الفيديو المضمّن والروابط المباشرة ورابط Google Drive واختيار أو سحب ملف من الجهاز
+         */
+        function initVideo() {
+            const activeDirectUrl = EMBEDDED_VIDEO_SRC || DIRECT_VIDEO_URL;
+
+            if (openSharePointBtnEl) {
+                openSharePointBtnEl.href = activeDirectUrl || GOOGLE_DRIVE_VIDEO_URL || "#";
+            }
+
+            if (localVideoInputEl) {
+                localVideoInputEl.addEventListener("change", (event) => {
+                    const file = event.target.files && event.target.files[0];
+                    if (!file) return;
+                    const objectUrl = URL.createObjectURL(file);
+                    loadVideoSource(objectUrl);
+                });
+            }
+
+            if (launchPanelEl) {
+                launchPanelEl.addEventListener("dragover", (event) => {
+                    event.preventDefault();
+                    launchPanelEl.classList.add("ring-2", "ring-brandOrange");
+                });
+                launchPanelEl.addEventListener("dragleave", () => {
+                    launchPanelEl.classList.remove("ring-2", "ring-brandOrange");
+                });
+                launchPanelEl.addEventListener("drop", (event) => {
+                    event.preventDefault();
+                    launchPanelEl.classList.remove("ring-2", "ring-brandOrange");
+                    const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+                    if (file && file.type.startsWith("video/")) {
+                        loadVideoSource(URL.createObjectURL(file));
+                    }
+                });
+            }
+
+            if (activeDirectUrl) {
+                loadVideoSource(activeDirectUrl);
+                return;
+            }
+
+            if (!GOOGLE_DRIVE_VIDEO_URL) {
+                showVideoLaunchPanel();
+                return;
+            }
+
+            const drivePreviewUrl = getGoogleDrivePreviewUrl(GOOGLE_DRIVE_VIDEO_URL);
+            if (drivePreviewUrl && driveFrameEl) {
+                videoEl.pause();
+                videoEl.classList.add("hidden");
+                if (launchPanelEl) {
+                    launchPanelEl.classList.add("hidden");
+                }
+                driveFrameEl.src = drivePreviewUrl;
+                driveFrameEl.classList.remove("hidden");
+                return;
+            }
+
+            showVideoLaunchPanel();
+        }
+
+        /**
+         * توليد محتوى HTML الخاص بكل شريحة
+         */
+        function buildSlideMarkup(slide) {
+            switch (slide.type) {
+                case "launch_announcement":
+                    return `
+                        <div class="space-y-6">
+                            <div class="space-y-3">
+                                <h2 class="text-3xl lg:text-5xl font-black text-white leading-tight">${slide.title}</h2>
+                                <p class="text-xl lg:text-3xl font-extrabold text-brandOrange">${slide.subtitle}</p>
+                            </div>
+                            <p class="text-lg lg:text-2xl text-slate-200 leading-relaxed max-w-4xl">
+                                ${slide.description}
+                            </p>
+                            <div class="inline-flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-brandOrange/20 to-amber-500/10 border border-orange-400/35 text-orange-200 shadow-lg">
+                                <i class="fa-regular fa-calendar-check text-brandOrange text-xl shrink-0"></i>
+                                <span class="text-base lg:text-xl font-extrabold text-white">${slide.deadlineNote}</span>
+                            </div>
+                        </div>
+                    `;
+
+                case "general_goal":
+                    return `
+                        <div class="space-y-6">
+                            <div class="space-y-2">
+                                <h2 class="text-3xl lg:text-5xl font-black text-white leading-tight">${slide.title}</h2>
+                                <p class="text-lg lg:text-2xl font-bold text-brandOrange">${slide.subtitle}</p>
+                            </div>
+                            <p class="text-lg lg:text-2xl text-slate-200 leading-relaxed max-w-4xl">
+                                ${slide.description}
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                ${slide.highlights.map(item => `
+                                    <div class="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+                                        <div class="w-12 h-12 rounded-xl bg-brandTeal/20 text-teal-300 flex items-center justify-center text-xl shrink-0">
+                                            <i class="fa-solid ${item.icon}"></i>
+                                        </div>
+                                        <span class="text-base lg:text-xl font-bold text-white">${item.text}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `;
+
+                case "partners":
+                    return `
+                        <div class="space-y-6">
+                            <div class="space-y-2">
+                                <h2 class="text-3xl lg:text-5xl font-black text-white">${slide.title}</h2>
+                                <p class="text-lg lg:text-2xl text-teal-300 font-semibold">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                ${slide.partners.map(partner => `
+                                    <div class="p-6 rounded-3xl bg-gradient-to-br from-white/10 to-white/[0.03] border border-white/15 flex flex-col gap-3 shadow-lg">
+                                        <div class="w-14 h-14 rounded-2xl bg-brandOrange/20 text-orange-300 flex items-center justify-center text-2xl">
+                                            <i class="fa-solid ${partner.icon}"></i>
+                                        </div>
+                                        <h3 class="text-2xl lg:text-3xl font-extrabold text-white">${partner.name}</h3>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `;
+
+                case "target_audience":
+                    return `
+                        <div class="space-y-6">
+                            <div class="space-y-2">
+                                <h2 class="text-3xl lg:text-5xl font-black text-white">${slide.title}</h2>
+                                <p class="text-lg lg:text-2xl text-orange-300 font-semibold">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                ${slide.stages.map(stage => `
+                                    <div class="p-5 rounded-2xl bg-white/[0.07] border border-white/15 text-center flex flex-col items-center gap-3">
+                                        <div class="w-14 h-14 rounded-2xl bg-brandTeal/20 text-teal-300 flex items-center justify-center text-2xl">
+                                            <i class="fa-solid ${stage.icon}"></i>
+                                        </div>
+                                        <span class="text-xl lg:text-2xl font-extrabold text-white">${stage.title}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+                            <p class="text-lg lg:text-2xl text-slate-200 leading-relaxed">
+                                ${slide.description}
+                            </p>
+                        </div>
+                    `;
+
+                case "axes":
+                    return `
+                        <div class="space-y-5">
+                            <div class="space-y-1">
+                                <h2 class="text-3xl lg:text-4xl font-black text-white">${slide.title}</h2>
+                                <p class="text-base lg:text-xl text-teal-300 font-semibold">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                ${slide.axesList.map((axis, idx) => `
+                                    <div class="flex items-center gap-4 p-3.5 lg:p-4 rounded-2xl bg-white/[0.07] border border-white/15 ${idx === 4 ? "md:col-span-2" : ""}">
+                                        <span class="w-10 h-10 rounded-xl bg-brandOrange text-white font-black text-lg flex items-center justify-center shrink-0">
+                                            ${idx + 1}
+                                        </span>
+                                        <span class="text-lg lg:text-2xl font-extrabold text-white">${axis}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `;
+
+                case "conditions_apps":
+                    return `
+                        <div class="space-y-4">
+                            <div class="space-y-1">
+                                <h2 class="text-2xl lg:text-4xl font-black text-white">${slide.title}</h2>
+                                <p class="text-base lg:text-lg text-orange-300 font-semibold">${slide.subtitle}</p>
+                            </div>
+
+                            <!-- التطبيقات والبرامج الرقمية -->
+                            <div class="p-4 rounded-2xl bg-brandTeal/15 border border-teal-400/30 space-y-2">
+                                <h3 class="text-lg lg:text-xl font-extrabold text-teal-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-tablet-screen-button"></i>
+                                    <span>${slide.appsTitle}</span>
+                                </h3>
+                                <div class="flex flex-wrap gap-2.5">
+                                    ${slide.appsList.map(app => `
+                                        <span class="px-3.5 py-1.5 rounded-xl bg-black/30 text-white text-sm lg:text-base font-bold border border-white/10">
+                                            • ${app}
+                                        </span>
+                                    `).join("")}
+                                </div>
+                            </div>
+
+                            <!-- أبرز الشروط باختصار -->
+                            <div class="space-y-2">
+                                ${slide.rulesList.map(rule => `
+                                    <div class="flex items-start gap-3 p-3 rounded-xl bg-white/[0.06] border border-white/10">
+                                        <i class="fa-solid fa-circle-check text-brandOrange text-lg lg:text-xl mt-1 shrink-0"></i>
+                                        <span class="text-sm lg:text-lg font-bold text-slate-100 leading-snug">${rule}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `;
+
+                case "awards":
+                    return `
+                        <div class="space-y-6">
+                            <div class="space-y-2">
+                                <h2 class="text-3xl lg:text-5xl font-black text-amber-300">${slide.title}</h2>
+                                <p class="text-lg lg:text-2xl text-white font-bold">${slide.subtitle}</p>
+                            </div>
+                            <p class="text-lg lg:text-2xl text-slate-200 leading-relaxed">
+                                ${slide.description}
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${slide.highlights.map(item => `
+                                    <div class="flex items-center gap-4 p-4 lg:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 to-orange-500/10 border border-amber-400/30">
+                                        <div class="w-13 h-13 p-3 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center text-2xl shrink-0">
+                                            <i class="fa-solid ${item.icon}"></i>
+                                        </div>
+                                        <span class="text-base lg:text-xl font-extrabold text-white">${item.text}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `;
+
+                case "qr_info":
+                    return `
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                            <div class="md:col-span-7 space-y-4">
+                                <h2 class="text-3xl lg:text-4xl font-black text-white leading-tight">${slide.title}</h2>
+                                <p class="text-lg lg:text-xl text-teal-300 font-bold">${slide.subtitle}</p>
+                                <p class="text-base lg:text-xl text-slate-200 leading-relaxed">${slide.description}</p>
+                                <div class="flex flex-wrap items-center gap-3 pt-1">
+                                    <div class="inline-flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/10 border border-white/15 text-sm lg:text-base font-bold text-orange-200">
+                                        <i class="fa-solid fa-mobile-screen-button text-brandOrange"></i>
+                                        <span>امسح الرمز للوصول المباشر إلى الدليل</span>
+                                    </div>
+                                    <a
+                                        href="${GUIDE_PDF_URL}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brandTeal hover:bg-teal-500 text-white text-sm lg:text-base font-extrabold transition"
+                                    >
+                                        <i class="fa-solid fa-file-pdf"></i>
+                                        <span>فتح الدليل</span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="md:col-span-5 flex flex-col items-center justify-center">
+                                <div class="w-44 h-44 lg:w-52 lg:h-52 rounded-3xl bg-white p-3.5 shadow-2xl border-4 border-brandOrange flex items-center justify-center text-slate-900">
+                                    ${
+                                        slide.qrUrl
+                                        ? `<img src="${slide.qrUrl}" alt="رمز QR للدليل" class="w-full h-full object-contain rounded-xl">`
+                                        : `<div id="dynamicQrBox" class="w-full h-full flex items-center justify-center"></div>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                default:
+                    return "";
+            }
+        }
+
+        /**
+         * رسم نقاط التنقل السريع بين الشرائح
+         */
+        function renderDots() {
+            slideDotsEl.innerHTML = slides.map((_, idx) => {
+                const active = idx === currentSlideIndex;
+                return `
+                    <button
+                        type="button"
+                        onclick="goToSlide(${idx})"
+                        aria-label="الانتقال إلى الشريحة ${idx + 1}"
+                        class="h-3 rounded-full transition-all cursor-pointer ${
+                            active
+                                ? "w-9 bg-brandOrange shadow-md shadow-orange-500/40"
+                                : "w-3 bg-white/25 hover:bg-white/50"
+                        }"
+                    ></button>
+                `;
+            }).join("");
+        }
+
+        /**
+         * عرض شريحة محددة وإعادة ضبط مؤقتها
+         */
+        function goToSlide(index) {
+            const total = slides.length;
+            currentSlideIndex = ((index % total) + total) % total;
+            elapsedSecondsInSlide = 0;
+
+            const slide = slides[currentSlideIndex];
+            slideBadgeEl.textContent = slide.badge;
+            slideCounterEl.textContent = `شريحة ${currentSlideIndex + 1} من ${total}`;
+            slideTimeTextEl.textContent = `${slide.duration} ثوانٍ`;
+            slideProgressBarEl.style.width = "0%";
+
+            // إعادة تشغيل أنيميشن الشريحة
+            slideContentContainer.classList.remove("slide-animate");
+            void slideContentContainer.offsetWidth;
+            slideContentContainer.innerHTML = buildSlideMarkup(slide);
+            slideContentContainer.classList.add("slide-animate");
+
+            // توليد رمز QR تلقائياً لرابط الدليل عند عرض شريحة المعلومات
+            if (slide.type === "qr_info" && !slide.qrUrl) {
+                const qrBox = document.getElementById("dynamicQrBox");
+                if (qrBox && typeof QRCode !== "undefined") {
+                    qrBox.innerHTML = "";
+                    new QRCode(qrBox, {
+                        text: GUIDE_PDF_URL,
+                        width: 170,
+                        height: 170,
+                        colorDark: "#061836",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                }
+            }
+
+            renderDots();
+        }
+
+        function nextSlide() {
+            goToSlide(currentSlideIndex + 1);
+        }
+
+        function prevSlide() {
+            goToSlide(currentSlideIndex - 1);
+        }
+
+        /**
+         * تشغيل المؤقت التلقائي للشرائح على شاشة التلفاز
+         */
+        function startAutoTimer() {
+            if (tickInterval) clearInterval(tickInterval);
+
+            const stepMs = 100;
+            tickInterval = setInterval(() => {
+                if (!isAutoPlay) return;
+
+                const currentDuration = slides[currentSlideIndex].duration;
+                elapsedSecondsInSlide += stepMs / 1000;
+
+                const percent = Math.min(100, (elapsedSecondsInSlide / currentDuration) * 100);
+                slideProgressBarEl.style.width = `${percent}%`;
+
+                if (elapsedSecondsInSlide >= currentDuration) {
+                    nextSlide();
+                }
+            }, stepMs);
+        }
+
+        /**
+         * تبديل وضع التقليب التلقائي
+         */
+        function toggleAutoPlay() {
+            isAutoPlay = !isAutoPlay;
+            if (isAutoPlay) {
+                autoPlayIconEl.className = "fa-solid fa-pause text-brandOrange";
+                autoPlayTextEl.textContent = "تلقائي";
+            } else {
+                autoPlayIconEl.className = "fa-solid fa-play text-emerald-400";
+                autoPlayTextEl.textContent = "متوقف";
+            }
+        }
+
+        /**
+         * كتم أو تشغيل صوت الفيديو
+         */
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (videoEl) {
+                videoEl.muted = isMuted;
+            }
+            if (muteIconEl) {
+                if (isMuted) {
+                    muteIconEl.className = "fa-solid fa-volume-xmark text-lg text-brandOrange";
+                } else {
+                    muteIconEl.className = "fa-solid fa-volume-high text-lg text-emerald-400";
+                    if (videoEl && !videoEl.classList.contains("hidden")) {
+                        videoEl.play().catch(() => {});
+                    }
+                }
+            }
+        }
+
+        /**
+         * تفعيل أو إلغاء وضع ملء الشاشة المناسب للتلفاز
+         */
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+
+        // دعم التنقل بالأسهم في لوحة المفاتيح أو جهاز التحكم (الريموت)
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "ArrowLeft") {
+                nextSlide();
+            } else if (event.key === "ArrowRight") {
+                prevSlide();
+            } else if (event.key === " ") {
+                event.preventDefault();
+                toggleAutoPlay();
+            }
+        });
+
+        // بدء التشغيل عند تحميل الصفحة
+        window.addEventListener("DOMContentLoaded", () => {
+            initVideo();
+            goToSlide(0);
+            startAutoTimer();
+        });
+
+        window.addEventListener("load", () => {
+            if (videoEl && !videoEl.classList.contains("hidden") && videoEl.src) {
+                videoEl.loop = true;
+                videoEl.play().catch(() => {});
+            }
+        });
+
+        // مراقبة دورية لضمان استمرار تشغيل الفيديو وتكراره بشكل دائم
+        setInterval(() => {
+            if (videoEl && !videoEl.classList.contains("hidden") && videoEl.src) {
+                videoEl.loop = true;
+                if (videoEl.paused || videoEl.ended) {
+                    if (videoEl.ended) {
+                        videoEl.currentTime = 0;
+                    }
+                    videoEl.play().catch(() => {});
+                }
+            }
+        }, 1500);
+    </script>
+</body>
+</html>
